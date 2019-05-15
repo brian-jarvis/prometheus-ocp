@@ -16,7 +16,7 @@ This project has been modified from the original [github.com/Havilland/prometheu
 ## Role Variables
 Below are the variables you might want to customize for your installation.
 
-For defaults see [`private/roles/openshift_application_monitoring/defaults/main.yaml`](private/roles/openshift_application_monitoring/defaults/main.yaml)
+For defaults see [`private/roles/openshift_application_monitoring/defaults/main.yml`](private/roles/openshift_application_monitoring/defaults/main.yml)
 
 * `cluster_prometheus_namespace`: Namespace where to deploy prometheus operator
 * `cluster_prometheus_apiGroup`: apiGroup for the prometheus-operator (don't use monitoring.coreos.com if cluster-monitoring-operator is present)
