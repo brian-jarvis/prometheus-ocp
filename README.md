@@ -2,122 +2,80 @@
 
 This role deploys a customized prometheus-operator to work alongside the cluster-monitoring operator present in OpenShift v3.11
 
-It can also deploy thanos to aggregate metrics from all prometheus instances that have been deployed by this role. 
-Thanos will use minio as object storage. 
-If you want to deploy Thanos 4 persistent volumes have to be available for the S3 object storage that will be used by thanos.
+It is intended to be run against an existing OpenShift 3.11 cluster.  You only need one instance in a cluster to monitor multiple applications.  New applications are automatically added to the monitoring by use of labels and creatiion of `ServiceMonitor` in each project.
 
-Additionally it can be run periodically to deploy prometheus instances and corresponding grafana instances into projects with a specified label
+This project has been modified from the original [github.com/Havilland/prometheus-ocp](https://github.com/Havilland/prometheus-ocp):
+  + Removed use of ansible modules not available in Ansible 2.6.
+  + Modified to make use of the same inventory as run to deploy cluster
+  + Removed any relation to images not published by Red Hat (Thanos, pushgateway)
+  + Set image urls to use oreg_url from inventory, allowing disconnected installs to work
+  + Changed layout to match the openshift-ansible project
+  + Made use of openshift-ansible roles where appropriate
 
-There is also the option to deploy a pushgateway into a Project. Add the label `pushgateway=true` to the project and run the role, this will deploy the pushgateway and also the corresponding ServiceMonitor.
-
-## Disclaimer
-
-This role currently works only with thanos v0.3.2 due to changes in the tsdb of prometheus in the version after v0.3.2. 
-
-## Requirements
-
-### General
-
-* OpenShift 3.11 or greater
-* Ansible 2.7.x
-* Python
-* Pip
-
-### Mac OS
-
-On Mac OS hosts where Brew manages the Ansible install (and therefore, a Python install as a dependency), please ensure that Pip is installed in the correct location:
-
-```bash
-
-# ensure python is up to date
-brew install python
-brew unlink python
-brew link python
-
-# add pip to path (note versions may be different depending on the state of brew)
-export PATH=/usr/local/Cellar/python/3.7.2_1/Frameworks/Python.framework/Versions/3.7/bin:$PATH
-
-# install pip
-mkdir tmp
-cd tmp
-curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
-python3 get-pip.py
-
-# when ready, run playbook with 'correct' interpreter i.e. the one managed by brew
-ansible-playbook -i hosts.inv site-install.yml -e 'ansible_python_interpreter=python3'
-```
 
 ## Role Variables
+Below are the variables you might want to customize for your installation.
 
-For defaults see [`defaults/main.yaml`](defaults/main.yaml)
+For defaults see [`private/roles/openshift_application_monitoring/defaults/main.yaml`](private/roles/openshift_application_monitoring/defaults/main.yaml)
 
-* `cluster_registry`: Image source
-* `cluster_openshift_version`: The version of OpenShift we're deploying onto. Ensures we pull the right image versions
 * `cluster_prometheus_namespace`: Namespace where to deploy prometheus operator
 * `cluster_prometheus_apiGroup`: apiGroup for the prometheus-operator (don't use monitoring.coreos.com if cluster-monitoring-operator is present)
-* `cluster_prometheus_operator_size`: 1
-* `cluster_prometheus_operator_version`: Which version of the prometheus-operator should be deployed
 * `cluster_prometheus_operator_serviceAccount`: Name of the prometheus-operator service account (currently also used for clusterrole)
-* `cluster_prometheus_namespace_label`: Namespace label that determines if prometheus and grafana will be deployed
-* `cluster_prometheus_namespace_serviceAccount`: prometheus service account name
-* `cluster_prometheus_grafana_serviceAccount`: grafana service account name
-* `cluster_prometheus_grafana_oauth_port`: oauth proxy port
-* `cluster_prometheus_grafana_port`: grafana port
+* `cluster_prometheus_namespace_label`: Namespace label that determines if prometheus and grafana will be deployed.  
 * `cluster_prometheus_grafana_storage_type`: What storage type should be used for grafana (none or pvc)
-* `cluster_prometheus_default_labelselector:`: Default label selector to be used by the Prometheus Operator to discover Custom Resources such as ServiceMonitors
-* `k8s_auth_verify_ssl: true | false` : Whether or not to verify the API server's SSL certificates
-* `cluster_thanos_aggregation: yes`: Whether to deploy thanos or not
-* `cluster_thanos_store_bucket: data`: Name of the object storage bucket to be used
-* `cluster_thanos_store_access_key: foobar`: Name of the access_key to connect to object storage
-* `cluster_thanos_store_secret_key: foobar123`: Secret key to access object storage
-* `cluster_thanos_store_minio_size: 20Gi`: Size of the persistent volumes to be used to back the object storage
-* `cluster_thanos_image: improbable/thanos`: Source of the thanos image
-* `cluster_thanos_image_version: v0.3.2`: Version of thanos to deploy
-* `cluster_thanos_minio_image: minio/minio`: Source of the minio image
-* `cluster_thanos_minio_image_version: latest`: Version of minio to deploy
-* `cluster_prometheus_nodeselector: `: Set nodeSelector for prometheus-operator, thanos components and minio
-* `cluster_thanos_store_traffic: external | internal`: Set to internal when communication should not leave cluster. Otherwise thanos will use external minio route for data (https included)
-* `cluster_default_route_label: "label: example"`: Set an additional label for thanos-query and minio route
+* `cluster_prometheus_default_labelselector:`: Default label selector to be used by the Prometheus Operator to discover Custom Resources such as ServiceMonitors.  All `ServiceMonitor` and application namespaces need to be labeled with to be monitored.
+* `cluster_monitoring_operator_node_selector: `: Set nodeSelector for prometheus-operator, prometheus, grafana, alertmanager
+* `cluster_monitoring_operator_alertmanager_config`: Default alertmanager configuration.  Note this uses the same variable as the Cluster Monitoring Operator (Openshift Monitoring).  
+  
+
 ## Usage
+To execute the installation perform the following:
 
-### Docker
+``` bash
+  # Copy the repository to the ansible cluster host used to deploy the cluster
+  mkdir ~/app-monitoring
+  cd ~/app-monitoring
+  git clone https://github.com/brian-jarvis/prometheus-ocp.git
+  cd prometheus-ocp
 
-The dockerfile will build a image with the role inside. You can customize the variables in the playbook.yml
-
-The container needs your .kube config with user logged in that has privileges of cluster-admin to deploy all necessary resources.
-
-To run the role it has to be started as follows:
-
-```bash
-docker run --network="host" --dns="$YOUR_DNS" -v /home/$USER/.kube:/root/.kube prometheus-ocp:1
-
+  # execute the installation
+  ansible-playbook -i [Inventory Path] ./config.yml
 ```
+## Grafana storage
+Before running the installation create a `PersistentVolume` that meets the following requirements:
+  + Has a storage class named the same as the value of `{{ cluster_prometheus_grafana_serviceAccount }}-app-monitor` variable.  "app-grafana-app-monitor" by default.
+  + Has a size of 1Gi
 
-### Example Playbook
+Set `cluster_prometheus_grafana_storage_type=pvc` in your inventory file.
 
-```yaml
+## Monitoring applications
+To monitor an application perform the following steps:
+1. Label the namespace so Prometheus knows to look for `ServiceMonitor` objects there
+    ``` bash
+      oc label ns [Namespace name] app-prometheus=monitoring
+    ```
 
-  ---
-  - hosts: jumpbox
-    any_errors_fatal: true
-    gather_facts: false
-    roles:
-      - prometheus-ocp
-```
+2. Create a `ServiceMonitor` in the application project.
+Note the apiVersion.
 
-### Example Inventory
+    ``` yaml
+    apiVersion: app-monitoring.redhat.io/v1
+    kind: ServiceMonitor
+    metadata:
+    labels:
+      app-prometheus: monitoring
+    name: app-monitor
+    namespace: app-namespace-name
+    spec:
+      endpoints:
+        - interval: 10s
+          port: web
+      selector:
+        matchLabels:
+          app: example-app
+    ```
 
-```ansible
-  [jumpbox]
-  localhost ansible_connection=local
-
-  [jumpbox:vars]
-  cluster_prometheus_namespace=monitoring-test
-  cluster_prometheus_apiGroup=test.monitoring.com
-  cluster_prometheus_namespace_serviceAccount=prometheus-test
-  cluster_prometheus_grafana_serviceAccount=grafana-test
-  cluster_prometheus_namespace_label="monitoring=true"
-```
+After creating the ServiceMonitor you should see the target showup in Prometheus.
 
 ## License
 
@@ -126,3 +84,4 @@ BSD
 ## Author Information
 
 Alexander Bartilla (alexander.bartilla@cloudwerkstatt.com)
+Brian Jarvis (bjarvis@redhat.com)

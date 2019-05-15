@@ -21,12 +21,12 @@ spec:
         args:
         - '--kubelet-service=kube-system/kubelet'
         - '--logtostderr=true'
-        - '--config-reloader-image={{ cluster_registry }}/openshift3/ose-configmap-reloader:{{ cluster_openshift_version }}'
-        - '--prometheus-config-reloader={{ cluster_registry }}/openshift3/ose-prometheus-config-reloader:{{ cluster_openshift_version }}'
-        - '--prometheus-default-base-image={{ cluster_registry }}/openshift3/prometheus'
+        - '--config-reloader-image={{ cluster_monitoring_operator_configmap_reloader_repo }}'
+        - '--prometheus-config-reloader={{ cluster_monitoring_operator_prometheus_reloader_repo }}'
+        - '--prometheus-default-base-image={{ cluster_monitoring_operator_prometheus_repo }}'
         - '--crd-apigroup={{ cluster_prometheus_apiGroup }}'
         - '--disable-auto-user-group'
-        image: '{{ cluster_registry }}/openshift3/ose-prometheus-operator:{{ cluster_openshift_version }}'
+        image: '{{ cluster_monitoring_operator_prometheus_operator_repo }}'
         ports:
         - containerPort: 8080
           name: http
@@ -40,9 +40,9 @@ spec:
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
-{% if cluster_prometheus_nodeselector is not none %}
+{% if cluster_monitoring_operator_node_selector is not none %}
       nodeSelector:
-        {{ cluster_prometheus_nodeselector }}
+        {{ cluster_monitoring_operator_node_selector }}
 {% endif %}
       securityContext:
         runAsNonRoot: true

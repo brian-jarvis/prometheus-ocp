@@ -1,0 +1,95 @@
+---
+# defaults file for prometheus-ocp
+
+l_cluster_monitoring_non_standard_reg_url: "{{ oreg_url | default(l_osm_registry_url_default) }}"
+l_cluster_monitoring_image_dicts:
+  origin:
+    prometheus_operator: quay.io/coreos/prometheus-operator
+    prometheus: openshift/prometheus
+    alertmanager: openshift/prometheus-alertmanager
+    node_exporter: openshift/prometheus-node-exporter
+    prometheus_config_reloader: quay.io/coreos/prometheus-config-reloader
+    configmap_reloader: quay.io/coreos/configmap-reload
+    grafana: grafana/grafana
+    kube_state_metrics: quay.io/coreos/kube-state-metrics
+    kube_rbac_proxy: quay.io/coreos/kube-rbac-proxy
+    oauth_proxy: openshift/oauth-proxy
+  openshift-enterprise:
+    prometheus_operator: "{{ l_cluster_monitoring_non_standard_reg_url | regex_replace('${component}' | regex_escape, 'prometheus-operator') | regex_replace('${version}' | regex_escape, openshift_image_tag | default('${version}')) }}"
+    prometheus: "{{ l_cluster_monitoring_non_standard_reg_url | regex_replace('ose-${component}' | regex_escape, 'prometheus') | regex_replace(':[^:]*$', '') }}"
+    alertmanager: "{{ l_cluster_monitoring_non_standard_reg_url | regex_replace('ose-${component}' | regex_escape, 'prometheus-alertmanager') | regex_replace(':[^:]*$', '') }}"
+    node_exporter: "{{ l_cluster_monitoring_non_standard_reg_url | regex_replace('ose-${component}' | regex_escape, 'prometheus-node-exporter') | regex_replace('${version}' | regex_escape, openshift_image_tag | default('${version}')) }}"
+    prometheus_config_reloader: "{{ l_cluster_monitoring_non_standard_reg_url | regex_replace('${component}' | regex_escape, 'prometheus-config-reloader') | regex_replace('${version}' | regex_escape, openshift_image_tag | default('${version}')) }}"
+    configmap_reloader: "{{ l_cluster_monitoring_non_standard_reg_url | regex_replace('${component}' | regex_escape, 'configmap-reloader') | regex_replace('${version}' | regex_escape, openshift_image_tag | default('${version}')) }}"
+    grafana: "{{ l_cluster_monitoring_non_standard_reg_url | regex_replace('ose-${component}' | regex_escape, 'grafana') | regex_replace('${version}' | regex_escape, openshift_image_tag | default('${version}')) }}"
+    kube_state_metrics: "{{ l_cluster_monitoring_non_standard_reg_url | regex_replace('${component}' | regex_escape, 'kube-state-metrics') | regex_replace('${version}' | regex_escape, openshift_image_tag | default('${version}')) }}"
+    kube_rbac_proxy: "{{ l_cluster_monitoring_non_standard_reg_url | regex_replace('${component}' | regex_escape, 'kube-rbac-proxy') | regex_replace('${version}' | regex_escape, openshift_image_tag | default('${version}')) }}"
+    oauth_proxy: "{{ l_cluster_monitoring_non_standard_reg_url | regex_replace('ose-${component}' | regex_escape, 'oauth-proxy') | regex_replace('${version}' | regex_escape, openshift_image_tag | default('${version}')) }}"
+
+cluster_monitoring_operator_prometheus_operator_repo: "{{l_cluster_monitoring_image_dicts[openshift_deployment_type]['prometheus_operator']}}"
+cluster_monitoring_operator_prometheus_repo: "{{l_cluster_monitoring_image_dicts[openshift_deployment_type]['prometheus']}}"
+cluster_monitoring_operator_alertmanager_repo: "{{l_cluster_monitoring_image_dicts[openshift_deployment_type]['alertmanager']}}"
+cluster_monitoring_operator_node_exporter_repo: "{{l_cluster_monitoring_image_dicts[openshift_deployment_type]['node_exporter']}}"
+cluster_monitoring_operator_prometheus_reloader_repo: "{{l_cluster_monitoring_image_dicts[openshift_deployment_type]['prometheus_config_reloader']}}"
+cluster_monitoring_operator_configmap_reloader_repo: "{{l_cluster_monitoring_image_dicts[openshift_deployment_type]['configmap_reloader']}}"
+cluster_monitoring_operator_grafana_image: "{{l_cluster_monitoring_image_dicts[openshift_deployment_type]['grafana']}}"
+cluster_monitoring_operator_kube_state_metrics_image: "{{l_cluster_monitoring_image_dicts[openshift_deployment_type]['kube_state_metrics']}}"
+cluster_monitoring_operator_kube_rbac_proxy_image: "{{l_cluster_monitoring_image_dicts[openshift_deployment_type]['kube_rbac_proxy']}}"
+cluster_monitoring_operator_proxy_image: "{{l_cluster_monitoring_image_dicts[openshift_deployment_type]['oauth_proxy']}}"
+
+
+cluster_monitoring_operator_node_selector: "{{ openshift_hosted_infra_selector | default('node-role.kubernetes.io/infra=true') | map_from_pairs }}"
+
+cluster_registry: registry.redhat.io # registry.access.redhat.com
+cluster_prometheus_namespace: app-monitoring
+cluster_prometheus_apiGroup: app-monitoring.redhat.io
+cluster_prometheus_operator_size: 1
+
+cluster_prometheus_operator_serviceAccount: app-prometheus
+cluster_prometheus_label: app-prometheus-operator
+cluster_prometheus_namespace_label: "app-monitor=monitor"
+cluster_prometheus_namespace_serviceAccount: operated-prometheus
+cluster_prometheus_grafana_serviceAccount: app-grafana
+cluster_prometheus_custom_label: "app-prometheus"
+cluster_prometheus_default_labelselector: "app-prometheus: monitoring"
+
+cluster_alertmanager_namespace_serviceAccount: operated-alertmanager
+alertmanager_instance_name: appmain
+
+cluster_prometheus_grafana_oauth_port: 3000
+cluster_prometheus_grafana_port: 3001
+
+cluster_prometheus_grafana_memory_requests: 100Mi
+cluster_prometheus_grafana_memory_limit: 200Mi
+cluster_prometheus_grafana_cpu_requests: 100m
+cluster_prometheus_grafana_cpu_limit: 200m
+
+cluster_prometheus_oauth_proxy_memory_requests: 100Mi
+cluster_prometheus_oauth_proxy_cpu_requests: 100m
+cluster_prometheus_oauth_proxy_memory_limit: 100Mi
+cluster_prometheus_oauth_proxy_cpu_limit: 100m
+
+cluster_prometheus_grafana_storage_type: none
+
+cluster_routes_use_https: yes
+
+cluster_default_route_label: "app-prometheus: monitoring"
+
+
+
+cluster_monitoring_operator_alertmanager_config: |+
+  global:
+    resolve_timeout: 5m
+  route:
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 12h
+    receiver: default
+    routes:
+    - match:
+        alertname: DeadMansSwitch
+      repeat_interval: 5m
+      receiver: deadmansswitch
+  receivers:
+  - name: default
+  - name: deadmansswitch

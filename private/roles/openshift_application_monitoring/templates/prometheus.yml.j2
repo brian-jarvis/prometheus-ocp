@@ -3,7 +3,7 @@ apiVersion: {{ cluster_prometheus_apiGroup }}/v1
 kind: Prometheus
 metadata:
   name: {{ cluster_prometheus_namespace_serviceAccount }}
-  namespace: {{ current_namespace.metadata.name }}
+  namespace: {{ cluster_prometheus_namespace }}
   labels:
     app-monitor: {{ cluster_prometheus_custom_label }}
 labels:
@@ -14,16 +14,26 @@ spec:
   serviceMonitorSelector:
     matchLabels:
       {{ cluster_prometheus_default_labelselector }}
+  serviceMonitorNamespaceSelector:
+    matchLabels:
+      {{ cluster_prometheus_default_labelselector }}
   secrets:
     - prometheus-tls
     - prometheus-proxy
     - prometheus-htpasswd
-{% if cluster_thanos_aggregation %}
-    - thanos-bucket-config
-{% endif %}
   listenLocal: true
   version: v2.3.2
-  tag: {{ cluster_openshift_version }}
+  tag: {{ openshift_image_tag }}
+  alerting:
+    alertmanagers:
+      - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+        name: alertmanager-{{ alertmanager_instance_name }}
+        namespace: {{ cluster_prometheus_namespace }}
+        port: web
+        scheme: https
+        tlsConfig:
+          caFile: /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+          serverName: alertmanager-{{ alertmanager_instance_name }}.{{ cluster_prometheus_namespace }}.svc
   containers:
     - name: prometheus-proxy
       args:
@@ -33,9 +43,9 @@ spec:
         - '-email-domain=*'
         - '-upstream=http://localhost:9090'
         - '-htpasswd-file=/etc/proxy/htpasswd/auth'
-        - '-client-id=system:serviceaccount:{{ current_namespace.metadata.name }}:{{ cluster_prometheus_namespace_serviceAccount }}'
+        - '-client-id=system:serviceaccount:{{ cluster_prometheus_namespace }}:{{ cluster_prometheus_namespace_serviceAccount }}'
         - '-openshift-service-account={{ cluster_prometheus_namespace_serviceAccount }}'
-        - '-openshift-sar={"namespace": "{{ current_namespace.metadata.name }}", "verb": "list", "resource": "services"}'
+        - '-openshift-sar={"namespace": "{{ cluster_prometheus_namespace }}", "verb": "list", "resource": "services"}'
         - '-tls-cert=/etc/tls/private/tls.crt'
         - '-tls-key=/etc/tls/private/tls.key'
         - '-client-secret-file=/var/run/secrets/kubernetes.io/serviceaccount/token'
@@ -43,7 +53,7 @@ spec:
         - '-openshift-ca=/etc/pki/tls/cert.pem'
         - '-openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt'
         - '-skip-auth-regex=^/metrics'
-      image: '{{ cluster_registry }}/openshift3/oauth-proxy:{{ cluster_openshift_version }}'
+      image: '{{ cluster_monitoring_operator_proxy_image }}'
       ports:
         - containerPort: 9091
           name: web
@@ -55,29 +65,3 @@ spec:
           name: secret-prometheus-proxy
         - mountPath: /etc/proxy/htpasswd
           name: secret-prometheus-htpasswd
-{% if cluster_thanos_aggregation %}
-    - name: thanos-sidecar
-      args:
-        - 'sidecar'
-        - '--prometheus.url=http://localhost:9090'
-        - '--tsdb.path=/prometheus'
-        - '--cluster.peers=thanos-peers.{{ cluster_prometheus_namespace }}.svc:10900'
-        - '--objstore.config-file=/var/run/thanos-config/thanos.yml'
-      image: '{{ cluster_thanos_image }}:{{ cluster_thanos_image_version }}'
-      imagePullPolicy: IfNotPresent
-      ports:
-        - containerPort: 10902
-          name: http
-          protocol: TCP
-        - containerPort: 10901
-          name: grpc
-          protocol: TCP
-        - containerPort: 10900
-          name: cluster
-          protocol: TCP
-      volumeMounts:
-        - mountPath: /prometheus
-          name: prometheus-{{ cluster_prometheus_namespace_serviceAccount }}-db
-        - mountPath: /var/run/thanos-config
-          name: secret-thanos-bucket-config
-{% endif %}

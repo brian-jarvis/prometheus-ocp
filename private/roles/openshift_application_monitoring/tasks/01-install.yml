@@ -1,0 +1,204 @@
+---
+- name: Ensure that Cluster Monitoring Operator has nodes to run on
+  import_role:
+    name: /usr/share/ansible/openshift-ansible/roles/openshift_control_plane
+    tasks_from: ensure_nodes_matching_selector.yml
+  vars:
+    openshift_master_ensure_nodes_selector: "{{ cluster_monitoring_operator_node_selector | map_to_pairs }}"
+    openshift_master_ensure_nodes_service: Application Monitoring Operator
+
+- name: Create temp directory for doing work in on target
+  command: mktemp -td prometheus-ocp-XXXXXX
+  register: mktemp
+  changed_when: False
+
+- set_fact:
+    tempdir: "{{ mktemp.stdout }}"
+
+- name: Copy admin client config
+  command: >
+    cp {{ openshift.common.config_base }}/master/admin.kubeconfig {{ tempdir }}/admin.kubeconfig
+  changed_when: false
+
+- name: Add monitoring project
+  oc_project:
+    state: present
+    name: "{{ cluster_prometheus_namespace }}"
+    description: Application Monitoring Prometheus
+    node_selector: ""
+
+- when: os_sdn_network_plugin_name == 'redhat/openshift-ovs-multitenant'
+  block:
+  - name: Waiting for netnamespace app-monitoring to be ready
+    oc_obj:
+      kind: netnamespace
+      name: "{{ cluster_prometheus_namespace }}"
+      state: list
+    register: get_output
+    until: not get_output.results.stderr is defined
+    retries: 30
+    delay: 1
+    changed_when: false
+
+  - name: Make app-monitoring project network global
+    command: >
+      {{ openshift_client_binary }} --config={{ tempdir }}/admin.kubeconfig adm pod-network make-projects-global {{ cluster_prometheus_namespace }}
+
+
+- name: Create app monitor cluster role
+  oc_clusterrole:
+    state: present
+    name: "{{ cluster_prometheus_namespace }}"
+    rules:
+      - apiGroups: ["apiextensions.k8s.io"]
+        resources: ["customresourcedefinitions"]
+        verbs: ["*"]
+      - apiGroups:
+        - '{{ cluster_prometheus_apiGroup }}'
+        resources:
+        - alertmanagers
+        - prometheuses
+        - prometheuses/finalizers
+        - alertmanagers/finalizers
+        - servicemonitors
+        - prometheusrules
+        verbs:
+        - '*'
+      - apiGroups:
+        - apps
+        resources:
+        - statefulsets
+        verbs:
+        - '*'
+      - apiGroups:
+        - ""
+        resources:
+        - configmaps
+        - secrets
+        verbs:
+        - '*'
+      - apiGroups:
+        - ""
+        resources:
+        - pods
+        verbs:
+        - list
+        - delete
+      - apiGroups:
+        - ""
+        resources:
+        - services
+        - endpoints
+        verbs:
+        - get
+        - create
+        - update
+      - apiGroups:
+        - ""
+        resources:
+        - nodes
+        verbs:
+        - list
+        - watch
+      - apiGroups:
+        - ""
+        resources:
+        - namespaces
+        verbs: 
+        - get
+        - list
+        - watch
+
+- name: Bind admin cluster-role to asb serviceaccount
+  oc_adm_policy_user:
+    state: present
+    resource_kind: cluster-role
+    resource_name: "{{ cluster_prometheus_namespace }}"
+    user: "system:serviceaccount:{{ cluster_prometheus_namespace }}:{{ cluster_prometheus_operator_serviceAccount }}"
+
+        
+- name: Create Curator service account
+  oc_serviceaccount:
+    state: present
+    name: "{{ cluster_prometheus_operator_serviceAccount }}"
+    namespace: "{{ cluster_prometheus_namespace }}"
+
+
+- name: "Create prometheus-operator.yml from template"
+  template:
+    src: "{{ item }}.j2"
+    dest: "{{ tempdir }}/{{ item }}"
+  loop:
+    - "prometheus-operator.yml"
+
+- name: "Deploy prometheus-operator"
+  oc_obj:
+    state: present
+    name: "{{ cluster_prometheus_namespace }}-operator"
+    namespace: "{{ cluster_prometheus_namespace }}"
+    kind: Deployment
+    files:
+    - "{{ tempdir }}/prometheus-operator.yml"
+    #delete_after: true
+
+
+
+
+- name: "Base Installation: Create app-prometheus clusterrole"
+  oc_clusterrole:
+    state: present
+    name: "{{ cluster_prometheus_namespace_serviceAccount }}"
+    rules:
+      - apiGroups:
+        - authentication.k8s.io
+        attributeRestrictions: null
+        resources:
+        - tokenreviews
+        verbs:
+        - create
+      - apiGroups:
+        - authorization.k8s.io
+        attributeRestrictions: null
+        resources:
+        - subjectaccessreviews
+        verbs:
+        - create
+      - apiGroups: [""]
+        resources:
+        - nodes
+        - services
+        - endpoints
+        - pods
+        verbs: 
+        - get
+        - list
+        - watch
+      - apiGroups: [""]
+        resources:
+        - configmaps
+        verbs: 
+        - get
+      - nonResourceURLs: 
+        - /metrics
+        verbs: 
+        - get
+
+- name: "Base Installation: Create clusterrole for grafana"
+  oc_clusterrole:
+    state: present
+    name: grafana
+    rules:
+      - apiGroups:
+        - authentication.k8s.io
+        attributeRestrictions: null
+        resources:
+        - tokenreviews
+        verbs:
+        - create
+      - apiGroups:
+        - authorization.k8s.io
+        attributeRestrictions: null
+        resources:
+        - subjectaccessreviews
+        verbs:
+        - create

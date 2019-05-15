@@ -1,0 +1,14 @@
+---
+# tasks file for prometheus-ocp
+
+- include: 00-config-tasks.yml
+
+- include_tasks: 01-install.yml
+
+- include_tasks: 03-app-monitoring.yml
+  # loop: "{{ namespaces_prom.resources|flatten(levels=1) }}"
+  # loop_control:
+  #   loop_var: current_namespace
+- include_tasks: 04-alertmanager.yml
+
+- include_tasks: 05-cleanup-tasks.yml

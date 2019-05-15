@@ -1,0 +1,70 @@
+apiVersion: {{ cluster_prometheus_apiGroup }}/v1
+#apiVersion: monitoring.coreos.com/v1
+kind: Alertmanager
+metadata:
+  labels:
+    alertmanager: {{ cluster_prometheus_namespace }}
+  name: {{ alertmanager_instance_name }}
+  namespace: {{ cluster_prometheus_namespace }}
+spec:
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+            - key: alertmanager
+              operator: In
+              values:
+              - {{ alertmanager_instance_name }}
+          namespaces:
+          - {{ cluster_prometheus_namespace }}
+          topologyKey: kubernetes.io/hostname
+        weight: 100
+  baseImage: {{ cluster_monitoring_operator_alertmanager_repo }}
+  containers:
+  - args:
+    - -provider=openshift
+    - -https-address=:9094
+    - -http-address=
+    - -email-domain=*
+    - -upstream=http://localhost:9093
+    - '-openshift-sar={"resource": "namespaces", "verb": "get"}'
+    - '-openshift-delegate-urls={"/": {"resource": "namespaces", "verb": "get"}}'
+    - -tls-cert=/etc/tls/private/tls.crt
+    - -tls-key=/etc/tls/private/tls.key
+    - -client-secret-file=/var/run/secrets/kubernetes.io/serviceaccount/token
+    - -cookie-secret-file=/etc/proxy/secrets/session_secret
+    - -openshift-service-account={{ cluster_alertmanager_namespace_serviceAccount }}
+    - -openshift-ca=/etc/pki/tls/cert.pem
+    - -openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    - -skip-auth-regex=^/metrics
+    env:
+    - name: HTTP_PROXY
+      value: ""
+    - name: HTTPS_PROXY
+      value: ""
+    - name: NO_PROXY
+      value: ""
+    image: '{{ cluster_monitoring_operator_proxy_image }}'
+    name: alertmanager-proxy
+    ports:
+    - containerPort: 9094
+      name: web
+    resources: {}
+    volumeMounts:
+    - mountPath: /etc/tls/private
+      name: secret-alertmanager-{{ alertmanager_instance_name }}-tls
+    - mountPath: /etc/proxy/secrets
+      name: secret-alertmanager-{{ alertmanager_instance_name }}-proxy
+  listenLocal: true
+  nodeSelector:
+    {{ cluster_monitoring_operator_node_selector }}
+  replicas: 3
+  secrets:
+  - alertmanager-{{ alertmanager_instance_name }}-tls
+  - alertmanager-{{ alertmanager_instance_name }}-proxy
+  securityContext: {}
+  serviceAccountName: {{ cluster_alertmanager_namespace_serviceAccount }}
+  tag: {{ openshift_image_tag }}
+  version: v0.15.2

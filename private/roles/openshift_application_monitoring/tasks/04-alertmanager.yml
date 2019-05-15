@@ -1,0 +1,107 @@
+---
+- name: "Alertmanager Deployment: deploy service account"
+  oc_serviceaccount:
+    state: present
+    name: "{{ cluster_alertmanager_namespace_serviceAccount }}"
+    namespace: "{{ cluster_prometheus_namespace }}"
+
+- name: Alertmanager set oauth redirect
+  command: >
+    {{ openshift_client_binary }}
+    --config={{ openshift.common.config_base }}/master/admin.kubeconfig
+    annotate  sa {{ cluster_alertmanager_namespace_serviceAccount }} -n {{ cluster_prometheus_namespace }}
+    serviceaccounts.openshift.io/oauth-redirectreference.primary='{"kind":"OAuthRedirectReference","apiVersion":"v1","reference":{"kind":"Route","name":"alertmanager"}}'
+    --overwrite
+
+- name: Create alertmanager cluster role
+  oc_clusterrole:
+    state: present
+    name: "{{ cluster_alertmanager_namespace_serviceAccount }}"
+    rules:
+    - apiGroups:
+      - authentication.k8s.io
+      resources:
+      - tokenreviews
+      verbs:
+      - create
+    - apiGroups:
+      - authorization.k8s.io
+      resources:
+      - subjectaccessreviews
+      verbs:
+      - create
+
+- name: Bind admin cluster-role to alertmanager serviceaccount
+  oc_adm_policy_user:
+    state: present
+    rolebinding_name: "{{ cluster_prometheus_namespace }}-{{ cluster_alertmanager_namespace_serviceAccount }}"
+    resource_kind: cluster-role
+    resource_name: "{{ cluster_alertmanager_namespace_serviceAccount }}"
+    user: "system:serviceaccount:{{ cluster_prometheus_namespace }}:{{ cluster_alertmanager_namespace_serviceAccount }}"
+
+- name: create service for alertmanager
+  oc_service:
+    name: alertmanager
+    namespace: "{{ cluster_prometheus_namespace }}"
+    labels:
+      app: alertmanager
+    annotations:
+      service.alpha.openshift.io/serving-cert-secret-name: "alertmanager-{{ alertmanager_instance_name }}-tls"
+    ports:
+      - name: web
+        port: 9094
+        targetPort: web
+        protocol: TCP
+    selector:
+      app: alertmanager
+
+- name: Create route for alertmanager
+  oc_route:
+    name: alertmanager
+    namespace: "{{ cluster_prometheus_namespace }}"
+    state: present
+    labels:
+      app: alertmanager
+      alertmanager: "{{ cluster_prometheus_namespace }}"
+    service_name: alertmanager
+    tls_termination: Reencrypt
+
+- name: Generate session_secret
+  set_fact:
+    session_secret: "{{ lookup('password', '/tmp/session_secret length=43 chars=ascii_letters,digits') }}"
+
+
+- name: Create alertmanager session_secret
+  oc_secret:
+    name: "alertmanager-{{ alertmanager_instance_name }}-proxy"
+    namespace: "{{ cluster_prometheus_namespace }}"
+    state: present
+    contents:
+    - path: session_secret
+      data: "{{ lookup('password', '/tmp/session_secret length=43 chars=ascii_letters,digits') }}"
+
+- name: Create alertmanager  config secret
+  oc_secret:
+    name: "alertmanager-{{ alertmanager_instance_name }}"
+    namespace: "{{ cluster_prometheus_namespace }}"
+    state: present
+    contents:
+    - path: alertmanager.yaml
+      data: "{{ cluster_monitoring_operator_alertmanager_config }}"
+
+
+- name: "Alertmanager Deployment: template deployment"
+  template:
+    src: "{{ item }}.j2"
+    dest: "{{ tempdir }}/{{ item }}"
+  loop:
+      - "alertmanager.yml"
+
+- name: "Alertmanager Deployment: create alertmanager CRD deployment"
+  oc_obj:
+    state: present
+    name: "{{ alertmanager_instance_name }}"
+    namespace: "{{ cluster_prometheus_namespace }}"
+    kind: Alertmanager
+    files:
+    - "{{ tempdir }}/alertmanager.yml"

@@ -1,0 +1,221 @@
+---
+- name: "Prometheus Deployment: deploy service account"
+  oc_serviceaccount:
+    state: present
+    name: "{{ cluster_prometheus_namespace_serviceAccount }}"
+    namespace: "{{ cluster_prometheus_namespace }}"
+
+- name: Prometheus set oauth redirect
+  command: >
+    {{ openshift_client_binary }}
+    --config={{ openshift.common.config_base }}/master/admin.kubeconfig
+    annotate  sa {{ cluster_prometheus_namespace_serviceAccount }} -n {{ cluster_prometheus_namespace }}
+    serviceaccounts.openshift.io/oauth-redirectreference.primary='{"kind":"OAuthRedirectReference","apiVersion":"v1","reference":{"kind":"Route","name":"prometheus"}}'
+    --overwrite
+
+- name: Bind admin cluster-role to prometheus serviceaccount
+  oc_adm_policy_user:
+    state: present
+    rolebinding_name: "{{ cluster_prometheus_namespace }}-{{ cluster_prometheus_namespace_serviceAccount }}"
+    resource_kind: cluster-role
+    resource_name: "{{ cluster_prometheus_namespace_serviceAccount }}"
+    user: "system:serviceaccount:{{ cluster_prometheus_namespace }}:{{ cluster_prometheus_namespace_serviceAccount }}"
+
+
+- name: create service for prometheus
+  oc_service:
+    name: prometheus
+    namespace: "{{ cluster_prometheus_namespace }}"
+    labels:
+      app-monitor: monitor
+    annotations:
+      service.alpha.openshift.io/serving-cert-secret-name: prometheus-tls
+    ports:
+      - name: web
+        port: 9091
+        targetPort: web
+        protocol: TCP
+    selector:
+      prometheus: "{{ cluster_prometheus_namespace_serviceAccount }}"
+
+
+- name: Create route for prometheus
+  oc_route:
+    name: prometheus
+    namespace: "{{ cluster_prometheus_namespace }}"
+    state: present
+    labels:
+      app-monitor: monitor
+    service_name: prometheus
+    #port: 9091
+    tls_termination: Reencrypt
+
+
+
+- name: Generate session_secret
+  set_fact:
+    session_secret: "{{ lookup('password', '/tmp/session_secret length=43 chars=ascii_letters,digits') }}"
+
+
+- name: Create prometheus session_secret
+  oc_secret:
+    name: prometheus-proxy
+    namespace: "{{ cluster_prometheus_namespace }}"
+    state: present
+    contents:
+    - path: session_secret
+      data: "{{ session_secret }}"
+    
+
+- name: Generate session secret for prometheus
+  htpasswd:
+    path: "{{ tempdir }}/prometheus.htpasswd"
+    name: internal
+    password: '{{ session_secret }}'
+    crypt_scheme: ldap_sha1
+
+- name: Slurp hosts file
+  slurp:
+    src: "{{ tempdir }}/prometheus.htpasswd"
+  register: prometheus_htpasswd
+
+- name: Create prometheus htpasswd auth secret
+  oc_secret:
+    name: prometheus-htpasswd
+    namespace: "{{ cluster_prometheus_namespace }}"
+    state: present
+    contents:
+      - path: auth
+        data: "{{ prometheus_htpasswd['content'] | b64decode }}"
+
+
+- name: "Prometheus Deployment: template deployment"
+  template:
+    src: "{{ item }}.j2"
+    dest: "{{ tempdir }}/{{ item }}"
+  loop:
+      - "prometheus.yml"
+
+- name: "Prometheus Deployment: create prometheus CRD deployment"
+  oc_obj:
+    state: present
+    name: "{{ cluster_prometheus_namespace_serviceAccount }}"
+    namespace: "{{ cluster_prometheus_namespace }}"
+    kind: Prometheus
+    files:
+    - "{{ tempdir }}/prometheus.yml"
+
+
+- name: "Grafana Deployment: create grafana service account"
+  oc_serviceaccount:
+    state: present
+    name: "{{ cluster_prometheus_grafana_serviceAccount }}"
+    namespace: "{{ cluster_prometheus_namespace }}"
+
+- name: Prometheus set oauth redirect
+  command: >
+    {{ openshift_client_binary }}
+    --config={{ openshift.common.config_base }}/master/admin.kubeconfig
+    annotate  sa {{ cluster_prometheus_grafana_serviceAccount }} -n {{ cluster_prometheus_namespace }}
+    serviceaccounts.openshift.io/oauth-redirectreference.primary='{"kind":"OAuthRedirectReference","apiVersion":"v1","reference":{"kind":"Route","name":"grafana"}}'
+    --overwrite
+
+
+
+- name: "Grafana Deployment: set clusterrolebinding for grafana service account"
+  oc_adm_policy_user:
+    state: present
+    resource_kind: cluster-role
+    resource_name: grafana
+    user: "system:serviceaccount:{{ cluster_prometheus_namespace }}:{{ cluster_prometheus_grafana_serviceAccount }}"
+
+- name: Create route for grafana
+  oc_route:
+    name: grafana
+    namespace: "{{ cluster_prometheus_namespace }}"
+    service_name: grafana
+    tls_termination: reencrypt
+
+
+
+- name: create service for grafana
+  oc_service:
+    name: grafana
+    namespace: "{{ cluster_prometheus_namespace }}"
+    labels:
+      name: grafana
+    annotations:
+      prometheus.io/scrape: "true"
+      prometheus.io/scheme: https
+      service.alpha.openshift.io/serving-cert-secret-name: grafana-tls
+    ports:
+      - name: https
+        port: "{{ cluster_prometheus_grafana_port }}"
+        targetPort: https
+        protocol: TCP
+    selector:
+      app: grafana
+
+
+
+- name: Create grafana session_secret
+  oc_secret:
+    name: grafana-proxy
+    namespace: "{{ cluster_prometheus_namespace }}"
+    state: present
+    contents:
+      - path: session_secret
+        data: "{{ lookup('password', '/tmp/session_secret length=43 chars=ascii_letters,digits') }}"
+
+
+- name: "Grafana Deployment: create grafana pvc"
+  oc_pvc:
+    state: present
+    name: "{{ cluster_prometheus_grafana_serviceAccount }}-pvc"
+    namespace: "{{ cluster_prometheus_namespace }}"
+    volume_capacity: "1Gi"
+    access_modes:
+      - ReadWriteOnce
+    storage_class_name: "{{ cluster_prometheus_grafana_serviceAccount }}-app-monitor"
+  when:
+    - cluster_prometheus_grafana_storage_type == "pvc"
+
+
+- name: "Grafana Deployment: template deployment and grafana-config"
+  template:
+    src: "{{ item }}.j2"
+    dest: "{{ tempdir }}/{{ item }}"
+  loop:
+    - "grafana.yml"
+    - "grafana-config.yml"
+    - "grafana-datasources.yml"
+
+- name: create grafana-config configmap
+  oc_configmap:
+    state: present
+    name: "grafana-config"
+    namespace: "{{ cluster_prometheus_namespace }}"
+    from_file:
+      grafana.ini: "{{ tempdir }}/grafana-config.yml"
+
+
+- name: Create grafana datasource secret
+  oc_secret:
+    name: grafana-datasources
+    namespace: "{{ cluster_prometheus_namespace }}"
+    files:
+      - name: prometheus.yaml
+        path: "{{ tempdir }}/grafana-datasources.yml"
+
+
+- name: "Grafana Deployment: create grafana deployment"
+  oc_obj:
+    state: present
+    name: "grafana"
+    namespace: "{{ cluster_prometheus_namespace }}"
+    kind: Deployment
+    files:
+    - "{{ tempdir }}/grafana.yml"
+
+
+

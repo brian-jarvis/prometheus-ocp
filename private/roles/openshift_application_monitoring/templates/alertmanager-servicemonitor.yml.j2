@@ -1,0 +1,19 @@
+apiVersion: {{ cluster_prometheus_apiGroup }}/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    {{ cluster_prometheus_namespace_label }}
+  name: alertmanager-{{ alertmanager-instance-name }}
+  namespace: {{ cluster_prometheus_namespace }}
+spec:
+  endpoints:
+  - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+    interval: 30s
+    port: web
+    scheme: https
+    tlsConfig:
+      caFile: /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+      serverName: alertmanager-{{ alertmanager-instance-name }}
+  selector:
+    matchLabels:
+      alertmanager: {{ cluster_prometheus_namespace }}
