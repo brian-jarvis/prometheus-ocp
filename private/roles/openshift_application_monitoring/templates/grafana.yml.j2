@@ -18,6 +18,12 @@ spec:
       name: grafana
     spec:
       serviceAccountName: {{ cluster_prometheus_grafana_serviceAccount }}
+{% if cluster_monitoring_operator_node_selector is iterable and cluster_monitoring_operator_node_selector | length > 0 %}
+      nodeSelector:
+{% for key, value in cluster_monitoring_operator_node_selector.items() %}
+        {{ key }}: "{{ value }}"
+{% endfor %}
+{% endif %}
       containers:
       - name: oauth-proxy
         args:

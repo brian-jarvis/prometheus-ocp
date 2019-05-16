@@ -34,6 +34,12 @@ spec:
         tlsConfig:
           caFile: /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
           serverName: alertmanager-{{ alertmanager_instance_name }}.{{ cluster_prometheus_namespace }}.svc
+{% if cluster_monitoring_operator_node_selector is iterable and cluster_monitoring_operator_node_selector | length > 0 %}
+  nodeSelector:
+{% for key, value in cluster_monitoring_operator_node_selector.items() %}
+    {{ key }}: "{{ value }}"
+{% endfor %}
+{% endif %}
   containers:
     - name: prometheus-proxy
       args:

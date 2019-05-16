@@ -58,8 +58,12 @@ spec:
     - mountPath: /etc/proxy/secrets
       name: secret-alertmanager-{{ alertmanager_instance_name }}-proxy
   listenLocal: true
+{% if cluster_monitoring_operator_node_selector is iterable and cluster_monitoring_operator_node_selector | length > 0 %}
   nodeSelector:
-    {{ cluster_monitoring_operator_node_selector }}
+{% for key, value in cluster_monitoring_operator_node_selector.items() %}
+    {{ key }}: "{{ value }}"
+{% endfor %}
+{% endif %}
   replicas: 3
   secrets:
   - alertmanager-{{ alertmanager_instance_name }}-tls

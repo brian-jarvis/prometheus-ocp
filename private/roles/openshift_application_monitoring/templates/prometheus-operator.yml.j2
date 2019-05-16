@@ -40,9 +40,11 @@ spec:
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
-{% if cluster_monitoring_operator_node_selector is not none %}
+{% if cluster_monitoring_operator_node_selector is iterable and cluster_monitoring_operator_node_selector | length > 0 %}
       nodeSelector:
-        {{ cluster_monitoring_operator_node_selector }}
+{% for key, value in cluster_monitoring_operator_node_selector.items() %}
+        {{ key }}: "{{ value }}"
+{% endfor %}
 {% endif %}
       securityContext:
         runAsNonRoot: true
