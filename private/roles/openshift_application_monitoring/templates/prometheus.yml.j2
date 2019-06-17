@@ -71,3 +71,15 @@ spec:
           name: secret-prometheus-proxy
         - mountPath: /etc/proxy/htpasswd
           name: secret-prometheus-htpasswd
+{% if cluster_prometheus_storage_enabled %}
+  storage:
+    resources: {}
+    volumeClaimTemplate:
+      metadata: {}
+      spec:
+        resources:
+          requests:
+            storage: {{ cluster_prometheus_storage_capacity }}
+        storageClassName: {{ cluster_prometheus_storage_class_name }}
+      status: {}
+{% endif %}

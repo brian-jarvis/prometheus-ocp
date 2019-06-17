@@ -72,3 +72,15 @@ spec:
   serviceAccountName: {{ cluster_alertmanager_namespace_serviceAccount }}
   tag: {{ openshift_image_tag }}
   version: v0.15.2
+{% if cluster_prometheus_alertmanager_storage_enabled %}
+  storage:
+    resources: {}
+    volumeClaimTemplate:
+      metadata: {}
+      spec:
+        resources:
+          requests:
+            storage: {{ cluster_prometheus_alertmanager_storage_capacity }}
+        storageClassName: {{ cluster_prometheus_alertmanager_storage_class_name }}
+      status: {}
+{% endif %}
