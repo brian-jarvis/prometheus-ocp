@@ -48,6 +48,19 @@ Before running the installation create a `PersistentVolume` that meets the follo
 
 Set `cluster_prometheus_grafana_storage_type=pvc` in your inventory file.
 
+## Prometheus and Alertmanager storage
+The following variables are available to set storage for Prometheus and Alertmanager.  Create appropriate persistent volumes to match.
+
+```
+cluster_prometheus_storage_enabled: false
+cluster_prometheus_storage_capacity: 5Gi
+cluster_prometheus_storage_class_name: ""
+
+cluster_prometheus_alertmanager_storage_enabled: false
+cluster_prometheus_alertmanager_storage_capacity: 5Gi
+cluster_prometheus_alertmanager_storage_class_name: ""
+```
+
 ## Monitoring applications
 To monitor an application perform the following steps:
 1. Label the namespace so Prometheus knows to look for `ServiceMonitor` objects there
