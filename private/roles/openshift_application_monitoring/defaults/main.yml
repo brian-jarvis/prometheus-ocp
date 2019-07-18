@@ -51,7 +51,7 @@ cluster_prometheus_namespace_label: "app-monitor=monitor"
 cluster_prometheus_namespace_serviceAccount: operated-prometheus
 cluster_prometheus_grafana_serviceAccount: app-grafana
 cluster_prometheus_custom_label: "app-prometheus"
-cluster_prometheus_default_labelselector: "app-prometheus: monitoring"
+cluster_prometheus_default_labelselector: "{{ default('app-prometheus=monitoring') | map_from_pairs }}"
 
 cluster_alertmanager_namespace_serviceAccount: operated-alertmanager
 alertmanager_instance_name: appmain

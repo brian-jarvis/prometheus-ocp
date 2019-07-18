@@ -11,12 +11,18 @@ labels:
 spec:
   replicas: 2
   serviceAccountName: {{ cluster_prometheus_namespace_serviceAccount }}
+{% if cluster_prometheus_default_labelselector is iterable and cluster_prometheus_default_labelselector | length > 0 %}
   serviceMonitorSelector:
     matchLabels:
-      {{ cluster_prometheus_default_labelselector }}
+{% for key, value in cluster_prometheus_default_labelselector.items() %}
+      {{ key }}: "{{ value }}"
+{% endfor %}
   serviceMonitorNamespaceSelector:
     matchLabels:
-      {{ cluster_prometheus_default_labelselector }}
+{% for key, value in cluster_prometheus_default_labelselector.items() %}
+      {{ key }}: "{{ value }}"
+{% endfor %}
+{% endif %}
   secrets:
     - prometheus-tls
     - prometheus-proxy
@@ -80,6 +86,6 @@ spec:
         resources:
           requests:
             storage: {{ cluster_prometheus_storage_capacity }}
-        storageClassName: {{ cluster_prometheus_storage_class_name }}
+        storageClassName: "{{ cluster_prometheus_storage_class_name }}"
       status: {}
 {% endif %}

@@ -81,6 +81,6 @@ spec:
         resources:
           requests:
             storage: {{ cluster_prometheus_alertmanager_storage_capacity }}
-        storageClassName: {{ cluster_prometheus_alertmanager_storage_class_name }}
+        storageClassName: "{{ cluster_prometheus_alertmanager_storage_class_name }}"
       status: {}
 {% endif %}
