@@ -1,0 +1,19 @@
+---
+apiVersion: {{ cluster_prometheus_apiGroup }}/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    k8s-app: {{ cluster_prometheus_namespace }}-operator
+{% for key, value in cluster_prometheus_default_labelselector.items() %}
+    {{ key }}: "{{ value }}"
+{% endfor %}
+  name: prometheus-operator
+spec:
+  endpoints:
+    - honorLabels: true
+      port: http
+      targetPort: http
+  namespaceSelector: {}
+  selector:
+    matchLabels:
+      k8s-app: {{ cluster_prometheus_namespace }}-operator

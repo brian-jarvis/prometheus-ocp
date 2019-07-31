@@ -3,22 +3,25 @@ apiVersion: {{ cluster_prometheus_apiGroup }}/v1
 kind: ServiceMonitor
 metadata:
   labels:
-    app: alertmanager
+    k8s-app: node-exporter
 {% for key, value in cluster_prometheus_default_labelselector.items() %}
     {{ key }}: "{{ value }}"
 {% endfor %}
-  name: alertmanager
+  name: node-exporter
 spec:
   endpoints:
     - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
       interval: 30s
-      port: web
+      port: https
       scheme: https
       targetPort: 0
       tlsConfig:
         caFile: /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
-        serverName: alertmanager.{{ cluster_prometheus_namespace }}.svc
-  namespaceSelector: {}
+        serverName: node-exporter.openshift-monitoring.svc
+  jobLabel: k8s-app
+  namespaceSelector: 
+    matchNames:
+      - openshift-monitoring
   selector:
     matchLabels:
-      app: alertmanager
+      k8s-app: node-exporter

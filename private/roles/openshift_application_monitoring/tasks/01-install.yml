@@ -28,6 +28,14 @@
     description: Application Monitoring Prometheus
     node_selector: ""
 
+- name: Label monitoring project
+  oc_label:
+    name: "{{ cluster_prometheus_namespace }}"
+    state: add
+    kind: namespace
+    labels:
+      "{{ cluster_prometheus_default_labelselector | dict2items }}"
+
 - when: os_sdn_network_plugin_name == 'redhat/openshift-ovs-multitenant'
   block:
   - name: Waiting for netnamespace app-monitoring to be ready
@@ -142,7 +150,19 @@
     - "{{ tempdir }}/prometheus-operator.yml"
     #delete_after: true
 
-
+- name: create service for prometheus-operator
+  oc_service:
+    name: "{{ cluster_prometheus_namespace }}-operator"
+    namespace: "{{ cluster_prometheus_namespace }}"
+    labels:
+      k8s-app: "{{ cluster_prometheus_namespace }}-operator"
+    ports:
+      - name: http
+        port: 8080
+        targetPort: http
+        protocol: TCP
+    selector:
+      k8s-app: "{{ cluster_prometheus_namespace }}-operator"
 
 
 - name: "Base Installation: Create app-prometheus clusterrole"

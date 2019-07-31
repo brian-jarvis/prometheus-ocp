@@ -22,6 +22,17 @@ spec:
 {% for key, value in cluster_prometheus_default_labelselector.items() %}
       {{ key }}: "{{ value }}"
 {% endfor %}
+  ruleNamespaceSelector:
+    matchLabels:
+{% for key, value in cluster_prometheus_default_labelselector.items() %}
+      {{ key }}: "{{ value }}"
+{% endfor %}
+  ruleSelector:
+    matchLabels:
+{% for key, value in cluster_prometheus_default_labelselector.items() %}
+      {{ key }}: "{{ value }}"
+{% endfor %}
+      role: alert-rules
 {% endif %}
   secrets:
     - prometheus-tls
@@ -33,13 +44,13 @@ spec:
   alerting:
     alertmanagers:
       - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
-        name: alertmanager-{{ alertmanager_instance_name }}
+        name: alertmanager
         namespace: {{ cluster_prometheus_namespace }}
         port: web
         scheme: https
         tlsConfig:
           caFile: /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
-          serverName: alertmanager-{{ alertmanager_instance_name }}.{{ cluster_prometheus_namespace }}.svc
+          serverName: alertmanager.{{ cluster_prometheus_namespace }}.svc
 {% if cluster_monitoring_operator_node_selector is iterable and cluster_monitoring_operator_node_selector | length > 0 %}
   nodeSelector:
 {% for key, value in cluster_monitoring_operator_node_selector.items() %}
@@ -57,7 +68,10 @@ spec:
         - '-htpasswd-file=/etc/proxy/htpasswd/auth'
         - '-client-id=system:serviceaccount:{{ cluster_prometheus_namespace }}:{{ cluster_prometheus_namespace_serviceAccount }}'
         - '-openshift-service-account={{ cluster_prometheus_namespace_serviceAccount }}'
-        - '-openshift-sar={"namespace": "{{ cluster_prometheus_namespace }}", "verb": "list", "resource": "services"}'
+        - '-openshift-sar={"resource": "namespaces", "verb": "get"}'
+        - >-
+          -openshift-delegate-urls={"/": {"resource": "namespaces", "verb":
+          "get"}}
         - '-tls-cert=/etc/tls/private/tls.crt'
         - '-tls-key=/etc/tls/private/tls.key'
         - '-client-secret-file=/var/run/secrets/kubernetes.io/serviceaccount/token'

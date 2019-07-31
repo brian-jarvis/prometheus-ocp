@@ -95,6 +95,11 @@
     dest: "{{ tempdir }}/{{ item }}"
   loop:
       - "prometheus.yml"
+      - "kube-state-metrics-servicemonitor.yml"
+      - "nodeexporter-servicemonitor.yml"
+      - "prometheus-operator-servicemonitor.yml"
+      - "prometheus-rules.yml"
+      - "prometheus-servicemonitor.yml"
 
 - name: "Prometheus Deployment: create prometheus CRD deployment"
   oc_obj:
@@ -105,6 +110,50 @@
     files:
     - "{{ tempdir }}/prometheus.yml"
 
+- name: "Prometheus Deployment: create servicemonitor: kube-state-metrics"
+  oc_obj:
+    state: present
+    name: "kube-state-metrics"
+    namespace: "{{ cluster_prometheus_namespace }}"
+    kind: ServiceMonitor
+    files:
+    - "{{ tempdir }}/kube-state-metrics-servicemonitor.yml"
+
+- name: "Prometheus Deployment: create servicemonitor: nodeexporter"
+  oc_obj:
+    state: present
+    name: "node-exporter"
+    namespace: "{{ cluster_prometheus_namespace }}"
+    kind: ServiceMonitor
+    files:
+    - "{{ tempdir }}/nodeexporter-servicemonitor.yml"
+
+- name: "Prometheus Deployment: create servicemonitor: prometheus-operator"
+  oc_obj:
+    state: present
+    name: "prometheus-operator"
+    namespace: "{{ cluster_prometheus_namespace }}"
+    kind: ServiceMonitor
+    files:
+    - "{{ tempdir }}/prometheus-operator-servicemonitor.yml"
+
+- name: "Prometheus Deployment: create servicemonitor: prometheus"
+  oc_obj:
+    state: present
+    name: "prometheus"
+    namespace: "{{ cluster_prometheus_namespace }}"
+    kind: ServiceMonitor
+    files:
+    - "{{ tempdir }}/prometheus-servicemonitor.yml"
+
+- name: "Prometheus Deployment: create PrometheusRule"
+  oc_obj:
+    state: present
+    name: "{{ cluster_prometheus_namespace }}-prometheus-rules"
+    namespace: "{{ cluster_prometheus_namespace }}"
+    kind: PrometheusRule
+    files:
+    - "{{ tempdir }}/prometheus-rules.yml"
 
 - name: "Grafana Deployment: create grafana service account"
   oc_serviceaccount:

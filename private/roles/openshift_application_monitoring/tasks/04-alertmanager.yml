@@ -96,6 +96,7 @@
     dest: "{{ tempdir }}/{{ item }}"
   loop:
       - "alertmanager.yml"
+      - "alertmanager-servicemonitor.yml"
 
 - name: "Alertmanager Deployment: create alertmanager CRD deployment"
   oc_obj:
@@ -105,3 +106,13 @@
     kind: Alertmanager
     files:
     - "{{ tempdir }}/alertmanager.yml"
+
+- name: "Alertmanager Deployment: create alertmanager servicemonitor"
+  oc_obj:
+    state: present
+    name: "alertmanager"
+    namespace: "{{ cluster_prometheus_namespace }}"
+    kind: ServiceMonitor
+    files:
+    - "{{ tempdir }}/alertmanager-servicemonitor.yml"
+    
