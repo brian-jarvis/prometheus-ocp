@@ -96,6 +96,7 @@
   loop:
       - "prometheus.yml"
       - "kube-state-metrics-servicemonitor.yml"
+      - "kubelet-servicemonitor.yml"
       - "nodeexporter-servicemonitor.yml"
       - "prometheus-operator-servicemonitor.yml"
       - "prometheus-rules.yml"
@@ -118,6 +119,15 @@
     kind: ServiceMonitor
     files:
     - "{{ tempdir }}/kube-state-metrics-servicemonitor.yml"
+
+- name: "Prometheus Deployment: create servicemonitor: kubelet"
+  oc_obj:
+    state: present
+    name: "kubelet"
+    namespace: "{{ cluster_prometheus_namespace }}"
+    kind: ServiceMonitor
+    files:
+    - "{{ tempdir }}/kubelet-servicemonitor.yml"
 
 - name: "Prometheus Deployment: create servicemonitor: nodeexporter"
   oc_obj:

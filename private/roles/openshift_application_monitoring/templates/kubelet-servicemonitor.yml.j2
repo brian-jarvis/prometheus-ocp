@@ -1,0 +1,36 @@
+---
+apiVersion: {{ cluster_prometheus_apiGroup }}/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    k8s-app: kubelet
+{% for key, value in cluster_prometheus_default_labelselector.items() %}
+    {{ key }}: "{{ value }}"
+{% endfor %}
+  name: kubelet
+spec:
+  endpoints:
+    - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+      honorLabels: true
+      interval: 30s
+      port: https-metrics
+      scheme: https
+      targetPort: 0
+      tlsConfig:
+        caFile: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+      honorLabels: true
+      interval: 30s
+      path: /metrics/cadvisor
+      port: https-metrics
+      scheme: https
+      targetPort: 0
+      tlsConfig:
+        caFile: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+  jobLabel: k8s-app
+  namespaceSelector:
+    matchNames:
+      - kube-system
+  selector:
+    matchLabels:
+      k8s-app: kubelet
