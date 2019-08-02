@@ -70,14 +70,17 @@ cluster_prometheus_oauth_proxy_memory_limit: 100Mi
 cluster_prometheus_oauth_proxy_cpu_limit: 100m
 
 cluster_prometheus_grafana_storage_type: none
+cluster_prometheus_grafana_storage_supplemental_group: ""
 
 cluster_prometheus_storage_enabled: false
 cluster_prometheus_storage_capacity: 5Gi
 cluster_prometheus_storage_class_name: ""
+cluster_prometheus_storage_supplemental_group: ""
 
 cluster_prometheus_alertmanager_storage_enabled: false
 cluster_prometheus_alertmanager_storage_capacity: 5Gi
 cluster_prometheus_alertmanager_storage_class_name: ""
+cluster_prometheus_alertmanager_storage_supplemental_group: ""
 
 cluster_routes_use_https: yes
 

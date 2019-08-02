@@ -68,7 +68,12 @@ spec:
   secrets:
   - alertmanager-{{ alertmanager_instance_name }}-tls
   - alertmanager-{{ alertmanager_instance_name }}-proxy
+{% if cluster_prometheus_alertmanager_storage_supplemental_group | length > 0 %}
+  securityContext:
+    supplementalGroups: [{{ cluster_prometheus_alertmanager_storage_supplemental_group }}]
+{% else %}
   securityContext: {}
+{% endif %}
   serviceAccountName: {{ cluster_alertmanager_namespace_serviceAccount }}
   tag: {{ openshift_image_tag }}
   version: v0.15.2

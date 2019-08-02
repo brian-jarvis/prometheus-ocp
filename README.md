@@ -25,7 +25,11 @@ For defaults see [`private/roles/openshift_application_monitoring/defaults/main.
 * `cluster_prometheus_grafana_storage_type`: What storage type should be used for grafana (none or pvc)
 * `cluster_prometheus_default_labelselector:`: Default label selector to be used by the Prometheus Operator to discover Custom Resources such as ServiceMonitors.  All `ServiceMonitor` and application namespaces need to be labeled with to be monitored.
 * `cluster_monitoring_operator_node_selector: `: Set nodeSelector for prometheus-operator, prometheus, grafana, alertmanager
-* `cluster_monitoring_operator_alertmanager_config`: Default alertmanager configuration.  Note this uses the same variable as the Cluster Monitoring Operator (Openshift Monitoring).  
+* `cluster_monitoring_operator_alertmanager_config`: Default alertmanager configuration.  Note this uses the same variable as the Cluster Monitoring Operator (Openshift Monitoring).
+* Use the following variables to control the supplimental groups used for nfs storage:
+  * `cluster_prometheus_alertmanager_storage_supplemental_group: "65534"`
+  * `cluster_prometheus_grafana_storage_supplemental_group: "65534"`
+  * `cluster_prometheus_storage_supplemental_group: "65534"`
   
 
 ## Usage

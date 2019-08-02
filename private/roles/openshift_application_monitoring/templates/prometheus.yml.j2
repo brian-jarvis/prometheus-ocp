@@ -91,6 +91,12 @@ spec:
           name: secret-prometheus-proxy
         - mountPath: /etc/proxy/htpasswd
           name: secret-prometheus-htpasswd
+{% if cluster_prometheus_storage_supplemental_group | length > 0 %}
+  securityContext:
+    supplementalGroups: [{{ cluster_prometheus_storage_supplemental_group }}]
+{% else %}
+  securityContext: {}
+{% endif %}
 {% if cluster_prometheus_storage_enabled %}
   storage:
     resources: {}

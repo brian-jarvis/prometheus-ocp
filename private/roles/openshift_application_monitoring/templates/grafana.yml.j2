@@ -105,6 +105,12 @@ spec:
           name: grafana-proxy-secrets
         - name: grafana-datasources
           mountPath: /etc/grafana/provisioning/datasources
+{% if cluster_prometheus_grafana_storage_supplemental_group | length > 0 %}
+      securityContext:
+        supplementalGroups: [{{ cluster_prometheus_grafana_storage_supplemental_group }}]
+{% else %}
+      securityContext: {}
+{% endif %}
       volumes:
       - name: grafana-config
         configMap:
