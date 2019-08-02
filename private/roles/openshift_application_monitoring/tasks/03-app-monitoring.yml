@@ -21,6 +21,13 @@
     resource_name: "{{ cluster_prometheus_namespace_serviceAccount }}"
     user: "system:serviceaccount:{{ cluster_prometheus_namespace }}:{{ cluster_prometheus_namespace_serviceAccount }}"
 
+- name: Bind admin cluster-role to prometheus serviceaccount
+  oc_adm_policy_user:
+    state: present
+    rolebinding_name: "prometheus-k8s-{{ cluster_prometheus_namespace_serviceAccount }}"
+    resource_kind: cluster-role
+    resource_name: "prometheus-k8s"
+    user: "system:serviceaccount:{{ cluster_prometheus_namespace }}:{{ cluster_prometheus_namespace_serviceAccount }}"
 
 - name: create service for prometheus
   oc_service:
