@@ -109,6 +109,13 @@
         data: "{{ prometheus_htpasswd['content'] | b64decode }}"
 
 
+- name: Create Prometheus StorageClass if defined
+  oc_storageclass:
+    name: "{{ cluster_prometheus_storage_class_name }}"
+    default_storage_class: "false"
+    provisioner: "no-provisioning"
+  when: "cluster_prometheus_storage_class_name != ''"
+
 - name: "Prometheus Deployment: template deployment"
   template:
     src: "{{ item }}.j2"
@@ -247,17 +254,24 @@
         data: "{{ lookup('password', '/tmp/session_secret length=43 chars=ascii_letters,digits') }}"
 
 
+- name: Create Grafana StorageClass if defined
+  oc_storageclass:
+    name: "{{ cluster_prometheus_grafana_storage_class_name }}"
+    default_storage_class: "false"
+    provisioner: "no-provisioning"
+  when: "cluster_prometheus_grafana_storage_class_name != ''"
+
 - name: "Grafana Deployment: create grafana pvc"
   oc_pvc:
     state: present
     name: "{{ cluster_prometheus_grafana_serviceAccount }}-pvc"
     namespace: "{{ cluster_prometheus_namespace }}"
-    volume_capacity: "1Gi"
+    volume_capacity: "{{ cluster_prometheus_grafana_storage_capacity }}"
     access_modes:
       - ReadWriteOnce
-    storage_class_name: "{{ cluster_prometheus_grafana_serviceAccount }}-app-monitor"
+    storage_class_name: "{{ cluster_prometheus_grafana_storage_class_name }}"
   when:
-    - cluster_prometheus_grafana_storage_type == "pvc"
+    - cluster_prometheus_grafana_storage_enabled
 
 
 - name: "Grafana Deployment: template deployment and grafana-config"

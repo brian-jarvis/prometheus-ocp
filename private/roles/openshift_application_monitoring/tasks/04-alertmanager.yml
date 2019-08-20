@@ -89,6 +89,12 @@
     - path: alertmanager.yaml
       data: "{{ cluster_monitoring_operator_alertmanager_config }}"
 
+- name: Create Alertmanager StorageClass if defined
+  oc_storageclass:
+    name: "{{ cluster_prometheus_alertmanager_storage_class_name }}"
+    default_storage_class: "false"
+    provisioner: "no-provisioning"
+  when: "cluster_prometheus_alertmanager_storage_class_name != ''"
 
 - name: "Alertmanager Deployment: template deployment"
   template:

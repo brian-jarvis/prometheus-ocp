@@ -22,7 +22,6 @@ For defaults see [`private/roles/openshift_application_monitoring/defaults/main.
 * `cluster_prometheus_apiGroup`: apiGroup for the prometheus-operator (don't use monitoring.coreos.com if cluster-monitoring-operator is present)
 * `cluster_prometheus_operator_serviceAccount`: Name of the prometheus-operator service account (currently also used for clusterrole)
 * `cluster_prometheus_namespace_label`: Namespace label that determines if prometheus and grafana will be deployed.  
-* `cluster_prometheus_grafana_storage_type`: What storage type should be used for grafana (none or pvc)
 * `cluster_prometheus_default_labelselector:`: Default label selector to be used by the Prometheus Operator to discover Custom Resources such as ServiceMonitors.  All `ServiceMonitor` and application namespaces need to be labeled with to be monitored.
 * `cluster_monitoring_operator_node_selector: `: Set nodeSelector for prometheus-operator, prometheus, grafana, alertmanager
 * `cluster_monitoring_operator_alertmanager_config`: Default alertmanager configuration.  Note this uses the same variable as the Cluster Monitoring Operator (Openshift Monitoring).
@@ -45,15 +44,9 @@ To execute the installation perform the following:
   # execute the installation
   ansible-playbook -i [Inventory Path] ./config.yml
 ```
-## Grafana storage
-Before running the installation create a `PersistentVolume` that meets the following requirements:
-  + Has a storage class named the same as the value of `{{ cluster_prometheus_grafana_serviceAccount }}-app-monitor` variable.  "app-grafana-app-monitor" by default.
-  + Has a size of 1Gi
 
-Set `cluster_prometheus_grafana_storage_type=pvc` in your inventory file.
-
-## Prometheus and Alertmanager storage
-The following variables are available to set storage for Prometheus and Alertmanager.  Create appropriate persistent volumes to match.
+## Prometheus, Alertmanager, and Grafana storage
+The following variables are available to set storage for Prometheus, Alertmanager, and Grafana.  Create appropriate persistent volumes to match.
 
 ```
 cluster_prometheus_storage_enabled: false
@@ -63,6 +56,10 @@ cluster_prometheus_storage_class_name: ""
 cluster_prometheus_alertmanager_storage_enabled: false
 cluster_prometheus_alertmanager_storage_capacity: 5Gi
 cluster_prometheus_alertmanager_storage_class_name: ""
+
+cluster_prometheus_grafana_storage_enabled: false
+cluster_prometheus_grafana_storage_capacity: 1Gi
+cluster_prometheus_grafana_storage_class_name: ""
 ```
 
 ## Monitoring applications
@@ -73,10 +70,10 @@ To monitor an application perform the following steps:
     ```
 
 2. Create a `ServiceMonitor` in the application project.
-Note the apiVersion.
+Note the apiVersion should be based on what `cluster_prometheus_apiGroup` is defined to.
 
     ``` yaml
-    apiVersion: app-monitoring.redhat.io/v1
+    apiVersion: {{ cluster_prometheus_apiGroup }}/v1
     kind: ServiceMonitor
     metadata:
     labels:
@@ -93,6 +90,8 @@ Note the apiVersion.
     ```
 
 After creating the ServiceMonitor you should see the target showup in Prometheus.
+
+You can also create `PrometheusRule` objects in your application project to create alerting rules.
 
 ## License
 
