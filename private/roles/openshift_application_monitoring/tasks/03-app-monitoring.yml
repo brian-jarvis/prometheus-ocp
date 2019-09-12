@@ -261,15 +261,27 @@
     provisioner: "no-provisioning"
   when: "cluster_prometheus_grafana_storage_class_name != ''"
 
+## using oc_pvc module has an issue when the storageclass is set to "".  
+#  it treats it as if the storageclass was not defined, which is a different behavior 
+#  than being defined with an empty string.
+#  So to correct we will create our own pvc from a template.
+- name: "Grafana Deployment: template pvc"
+  template:
+    src: "{{ item }}.j2"
+    dest: "{{ tempdir }}/{{ item }}"
+  loop:
+      - "grafana.pvc.yml"
+  when:
+    - cluster_prometheus_grafana_storage_enabled
+
 - name: "Grafana Deployment: create grafana pvc"
-  oc_pvc:
+  oc_obj:
     state: present
     name: "{{ cluster_prometheus_grafana_serviceAccount }}-pvc"
     namespace: "{{ cluster_prometheus_namespace }}"
-    volume_capacity: "{{ cluster_prometheus_grafana_storage_capacity }}"
-    access_modes:
-      - ReadWriteOnce
-    storage_class_name: "{{ cluster_prometheus_grafana_storage_class_name }}"
+    kind: PersistentVolumeClaim
+    files:
+    - "{{ tempdir }}/grafana.pvc.yml"
   when:
     - cluster_prometheus_grafana_storage_enabled
 

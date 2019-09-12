@@ -1,0 +1,13 @@
+---
+apiVersion: "v1"
+kind: "PersistentVolumeClaim"
+metadata:
+  name: "{{ cluster_prometheus_grafana_serviceAccount }}-pvc"
+  namespace: "{{ cluster_prometheus_namespace }}"
+spec:
+  accessModes:
+    - "ReadWriteOnce"
+  resources:
+    requests:
+      storage: "{{ cluster_prometheus_grafana_storage_capacity }}"
+  storageClassName: "{{ cluster_prometheus_grafana_storage_class_name }}"
