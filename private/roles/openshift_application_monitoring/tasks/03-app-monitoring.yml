@@ -282,6 +282,7 @@
     kind: PersistentVolumeClaim
     files:
     - "{{ tempdir }}/grafana.pvc.yml"
+  ignore_errors: yes
   when:
     - cluster_prometheus_grafana_storage_enabled
 
